@@ -1,144 +1,33 @@
-/*
-    Process the Finance API response (data)
-    Create the train freatures and labels for cnn
-    Each prediction is base on previous timePortion days
-    ex. timePortion=7, prediction for the next day is based to values of the previous 7 days
-*/
-const processData = function (data, timePortion) {
-    return new Promise(function (resolve, reject) {
-        let trainX = [], trainY = [], size = data.length;
-
-        let features = [];
-        for (let i = 0; i < size; i++) {
-            features.push(data[i]['close']);
+const processData = (data, timePortion) => new Promise(resolve => {
+    const trainX = [], trainY = [], features = Array.from(data, d => d['close']),
+    scaledData = minMaxScaler(features, getMin(features), getMax(features)), scaledFeatures = scaledData.data;
+    try {
+        for (let i = timePortion; i < data.length; i++) {
+            for (let j = i - timePortion; j < i; j++) trainX.push(scaledFeatures[j]);
+            trainY.push(scaledFeatures[i]);
         }
 
-        // Scale the values
-        var scaledData = minMaxScaler(features, getMin(features), getMax(features));
-        let scaledFeatures = scaledData.data;
-     
-        try {
-            // Create the train sets
-            for (let i = timePortion; i < size; i++) {
-
-                for (let j = (i - timePortion); j < i; j++) {
-                    trainX.push(scaledFeatures[j]);
-                }
-
-                trainY.push(scaledFeatures[i]);
-            }
-
-        } catch (ex) {
-            resolve(ex);
-            console.log(ex);
-        }
-
-        return resolve({
-            size: (size - timePortion),
-            timePortion: timePortion,
-            trainX: trainX,
-            trainY: trainY,
-            min: scaledData.min,
-            max: scaledData.max,
-            originalData: features,
-        })
-    });
-};
-
-
-/*
-    This will take the last timePortion days from the data
-    and they will be used to predict the next day stock price
-*/
-const generateNextDayPrediction = function (data, timePortion) {
-    let size = data.length;
-    let features = [];
-
-    for (let i = (size - timePortion); i < size; i++) {
-        features.push(data[i]);
+    } catch (ex) {
+        resolve(ex);
+        console.log(ex);
     }
-    
+    return resolve({ size: data.length - timePortion, timePortion, trainX, trainY, min: scaledData.min, max: scaledData.max, originalData: features })
+}), generateNextDayPrediction = (data, timePortion) => {
+    const size = data.length, features = [];
+    for (let i = size - timePortion; i < size; i++) features.push(data[i]);
     return features;
-}
-
-/*
-    Scaling feature using min-max normalization.
-    All values will be between 0 and 1
-*/
-const minMaxScaler = function (data, min, max) {
-
-    let scaledData = data.map(function (value) {
-        return (value - min) / (max - min);
-    });
-    
-    return {
-        data: scaledData,
-        min: min,
-        max: max
-    }
-}
-
-
-/*
-    Revert min-max normalization and get the real values
-*/
-const minMaxInverseScaler = function (data, min, max) {
-
-    let scaledData = data.map(function (value) {
-        return value * (max - min) + min;
-    });
-
-    return {
-        data: scaledData,
-        min: min,
-        max: max
-    }
-}
-
-
-/*
-    Get min value from array
-*/
-const getMin = function (data) {
-    return Math.min(...data);
-} 
-
-
-/*
-    Get max value from array
-*/
-const getMax = function (data) {
-    return Math.max(...data);
-} 
-
-
-/*
-    Adds days to given date
-*/
-Date.prototype.addDays = function(days) {
-    var date = new Date(this.valueOf());
-    date.setDate(date.getDate() + days);
-    return date;
-}
-
-
-/*
-    Add text in the html view
-*/
-const print = function (text) {
-    let el = document.getElementsByClassName('cnn')[0];
-    let elem = document.createElement('h5');
+}, minMaxScaler = (data, min, max) => ({ data: data.map(value => (value - min) / (max - min)), min, max }),
+minMaxInverseScaler = (data, min, max) => ({ data: data.map(value => value * (max - min) + min), min, max }),
+getMin = data => Math.min(...data), getMax = data => Math.max(...data), print = text => {
+    const el = document.getElementsByClassName('cnn')[0], elem = document.createElement('h5');
     elem.innerHTML = text;
     el.append(elem);
     el.append(document.createElement('br'))
     console.log(text)
-};
+}, clearPrint = () => document.getElementsByClassName('cnn')[0].innerHTML = "";
 
-
-/*
-    Clear the html view
-*/
-const clearPrint = function () {
-    let el = document.getElementsByClassName('cnn')[0];
-    el.innerHTML = "";
+Date.prototype.addDays = days => {
+    const date = new Date(this.valueOf());
+    date.setDate(date.getDate() + days);
+    return date;
 }
